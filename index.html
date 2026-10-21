@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consulta de PC e SC</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--d:#14532d;--m:#2f855a;--l:#e8f5ec;--l2:#f4faf6;--bd:#cfe5d6;--tx:#1b2e22;--mut:#6b8575;--red:#b42318;--redbg:#fdeceb;--amb:#a15c07;--ambbg:#fff4e0;--blue:#0b5cad;--bluebg:#e6f1fc}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--l2);color:var(--tx);font-size:14px}
+header{background:linear-gradient(120deg,var(--d),var(--m));color:#fff;padding:22px 32px}
+header h1{margin:0;font-size:20px;font-weight:600;letter-spacing:.3px}
+header p{margin:4px 0 0;opacity:.8;font-size:13px}
+main{padding:24px 32px;max-width:1500px;margin:auto}
+.imports{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:18px}
+.card{background:#fff;border:1px solid var(--bd);border-radius:12px;padding:14px}
+.card h3{margin:0 0 2px;font-size:13px;font-weight:600;color:var(--d)}
+.card small{color:var(--mut);display:block;min-height:30px;font-size:11.5px}
+.card .st{font-size:12px;margin:6px 0 10px;color:var(--mut)}
+.card .st b{color:var(--m)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+button,.btn{font:inherit;cursor:pointer;border:0;border-radius:8px;padding:8px 14px;background:var(--m);color:#fff;font-weight:500;transition:.15s;display:inline-block}
+button:hover,.btn:hover{background:var(--d)}
+.ghost{background:var(--l);color:var(--d)}.ghost:hover{background:var(--bd)}
+.danger{background:var(--redbg);color:var(--red)}.danger:hover{background:#f9d4d1}
+input[type=file]{display:none}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:6px 0 16px}
+.bar .sp{flex:1}
+.sum{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip{background:#fff;border:1px solid var(--bd);border-radius:20px;padding:5px 12px;font-size:12.5px}
+.chip b{color:var(--d)}
+.wrap{overflow-x:auto;background:#fff;border:1px solid var(--bd);border-radius:12px}
+table{border-collapse:collapse;width:100%}
+th{background:var(--d);color:#fff;text-align:left;padding:10px 12px;font-weight:500;font-size:12.5px;white-space:nowrap}
+td{padding:10px 12px;border-top:1px solid var(--bd);vertical-align:top;min-width:170px}
+td.c{font-weight:600;color:var(--d);min-width:90px;white-space:nowrap}
+td.ds{min-width:200px}
+tr:nth-child(even) td{background:var(--l2)}
+.it{border-left:3px solid var(--m);padding:2px 0 2px 8px;font-size:12.5px;line-height:1.5}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:10px;margin-bottom:3px}
+.t-v{background:var(--l);color:var(--d)}.t-a{background:var(--ambbg);color:var(--amb)}.t-l{background:var(--bluebg);color:var(--blue)}.t-s{background:#ece9fb;color:#4b3bb0}
+.it.v{border-color:var(--m)}.it.a{border-color:#e0a030}.it.l{border-color:var(--blue)}.it.s{border-color:#6b5bd6}
+.warn{display:block;margin-top:4px;padding:3px 7px;border-radius:6px;background:var(--amb-bg,var(--ambbg));color:var(--amb);font-weight:600;font-size:12px}
+.alert{background:var(--redbg);color:var(--red)}
+.rep{background:var(--redbg);color:var(--red);font-weight:600;padding:3px 8px;border-radius:6px;font-size:12px;display:inline-block}
+.empty{text-align:center;color:var(--mut);padding:50px 10px}
+@media print{header,.imports,.bar,#msg{display:none}main{padding:0}body{background:#fff;font-size:11px}.wrap{border:0;overflow:visible}th,.tag,.warn,.rep,.alert{-webkit-print-color-adjust:exact;print-color-adjust:exact}td{min-width:0}tr{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header><h1>Consulta de Pedidos e Solicitações de Compra</h1><p>Importe as bases, depois a planilha de consulta (código na coluna A).</p></header>
+<main>
+<div class="imports" id="imports"></div>
+<div class="bar">
+  <label class="btn" for="f-consulta">Importar planilha de consulta</label>
+  <input type="file" id="f-consulta" accept=".xlsx,.xls,.csv">
+  <button class="danger" id="clear">Nova consulta (limpar)</button>
+  <span class="sp"></span>
+  <span id="msg" style="color:var(--mut)"></span>
+  <button class="ghost" onclick="window.print()">Imprimir / PDF</button>
+</div>
+<div class="sum" id="sum"></div>
+<div class="wrap"><table id="tb"><tbody><tr><td class="empty">Nenhuma consulta importada.</td></tr></tbody></table></div>
+</main>
+<script>
+const BASES={
+ verde:{nome:'PC Verde',desc:'Aguardando entrega',cor:'#2f855a',cols:{ped:1,comp:6,cod:7,desc:8,qtd:12,ent:15}},
+ amarelo:{nome:'PC Amarelo',desc:'Entrega parcial',cor:'#e0a030',cols:{ped:1,comp:6,cod:7,desc:8,qtd:12,ent:15,entregue:21}},
+ laranja:{nome:'PC Laranja',desc:'Em recebimento (já chegou)',cor:'#0b5cad',cols:{ped:1,comp:6,cod:7,desc:8,qtd:12}},
+ sc:{nome:'SC Azul',desc:'Solicitação de compra',cor:'#6b5bd6',cols:{ped:1,cod:3,desc:4,qtd:8,criacao:15,nec:16}}
+};
+// ---------- IndexedDB ----------
+let db;
+const open=()=>new Promise((ok,er)=>{const r=indexedDB.open('consulta_pc_sc',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{db=r.result;ok()};r.onerror=()=>er(r.error)});
+const put=(k,v)=>new Promise((ok,er)=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=ok;t.onerror=()=>er(t.error)});
+const get=k=>new Promise(ok=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>ok(q.result)});
+const del=k=>new Promise(ok=>{const t=db.transaction('kv','readwrite');t.objectStore('kv').delete(k);t.oncomplete=ok});
+// ---------- util ----------
+const norm=v=>String(v??'').trim().replace(/\.0+$/,'').toUpperCase();
+const num=v=>{if(typeof v==='number')return v;const s=String(v??'').trim().replace(/\./g,'').replace(',','.');return s===''?NaN:Number(s)};
+const iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+function pdate(v){
+ if(v==null||v==='')return null;
+ if(v instanceof Date&&!isNaN(v))return iso(v);
+ if(typeof v==='number'&&v>20000&&v<80000)return iso(new Date(Math.round((v-25569)*864e5)+12*36e5));
+ const m=String(v).trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+ if(m){let y=+m[3];if(y<100)y+=2000;return y+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0')}
+ const d=new Date(v);return isNaN(d)?null:iso(d);
+}
+const hoje=()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate())};
+const diasDesde=s=>{if(!s)return null;const[y,m,d]=s.split('-').map(Number);return Math.round((hoje()-new Date(y,m-1,d))/864e5)};
+const fmt=s=>s?s.split('-').reverse().join('/'):'—';
+const fq=n=>Number.isFinite(n)?n.toLocaleString('pt-BR'):'—';
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function lerArquivo(file){
+ const buf=await file.arrayBuffer();
+ const wb=XLSX.read(buf,{type:'array',cellDates:true});
+ return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''});
+}
+// ---------- importação ----------
+function montarImports(){
+ const el=document.getElementById('imports');
+ el.innerHTML=Object.entries(BASES).map(([k,b])=>`<div class="card"><h3><span class="dot" style="background:${b.cor}"></span>${b.nome}</h3><small>${b.desc}</small><div class="st" id="st-${k}">Não importada</div><label class="btn ghost" for="f-${k}">Importar ${b.nome}</label><input type="file" id="f-${k}" accept=".xlsx,.xls,.csv"></div>`).join('');
+ Object.keys(BASES).forEach(k=>document.getElementById('f-'+k).addEventListener('change',e=>importarBase(k,e.target)));
+}
+async function importarBase(k,inp){
+ const f=inp.files[0];if(!f)return;
+ try{
+  const rows=await lerArquivo(f),c=BASES[k].cols,out=[];
+  for(const r of rows){
+   const cod=norm(r[c.cod]);if(!cod)continue;
+   const q=num(r[c.qtd]);if(!Number.isFinite(q))continue; // ignora cabeçalho
+   const o={cod,desc:String(r[c.desc]??'').trim(),ped:String(r[c.ped]??'').trim(),qtd:q};
+   if(c.comp!=null)o.comp=String(r[c.comp]??'').trim();
+   if(c.ent!=null)o.ent=pdate(r[c.ent]);
+   if(c.entregue!=null){const e=num(r[c.entregue]);o.entregue=Number.isFinite(e)?e:0}
+   if(c.criacao!=null)o.criacao=pdate(r[c.criacao]);
+   if(c.nec!=null)o.nec=pdate(r[c.nec]);
+   out.push(o);
+  }
+  await put('base_'+k,{rows:out,data:new Date().toISOString(),arq:f.name});
+  msg(`${BASES[k].nome}: ${out.length} linhas importadas.`);
+  await atualizarStatus();await render();
+ }catch(e){msg('Erro ao ler arquivo: '+e.message,1)}
+ inp.value='';
+}
+async function importarConsulta(inp){
+ const f=inp.files[0];if(!f)return;
+ try{
+  const rows=await lerArquivo(f),itens=[],vistos=new Set();
+  rows.forEach((r,i)=>{
+   const cod=norm(r[0]);if(!cod)return;
+   if(i===0&&/c[oó]d|produto|item/i.test(cod))return;
+   if(vistos.has(cod))return;vistos.add(cod);
+   itens.push({cod,desc:String(r[1]??'').trim()});
+  });
+  await put('consulta',{itens,arq:f.name});
+  msg(`${itens.length} códigos na consulta.`);await render();
+ }catch(e){msg('Erro ao ler arquivo: '+e.message,1)}
+ inp.value='';
+}
+async function atualizarStatus(){
+ for(const k of Object.keys(BASES)){
+  const d=await get('base_'+k),el=document.getElementById('st-'+k);
+  el.innerHTML=d?`<b>${d.rows.length}</b> linhas · ${new Date(d.data).toLocaleDateString('pt-BR')}`:'Não importada';
+ }
+}
+function msg(t,err){const m=document.getElementById('msg');m.textContent=t;m.style.color=err?'var(--red)':'var(--mut)'}
+// ---------- relatório ----------
+function atraso(dias,limite){ // dias de atraso de PC
+ if(dias==null||dias<=0)return'';
+ let h=`<span class="warn">Atrasado há ${dias} dia${dias>1?'s':''}</span>`;
+ if(dias>10)h+=`<span class="warn alert">⚠ Mais de 10 dias de atraso: pode não chegar. Verificar com o Compras.</span>`;
+ return h;
+}
+function cardPC(k,o){
+ const cls={verde:'v',amarelo:'a',laranja:'l'}[k];
+ let h=`<div class="it ${cls}"><span class="tag t-${cls}">${BASES[k].nome}</span><br>Pedido <b>${esc(o.ped)}</b> · ${esc(o.comp||'—')}<br>`;
+ if(k==='laranja')return h+`Qtd ${fq(o.qtd)}<br><span class="warn" style="background:var(--bluebg);color:var(--blue)">✔ JÁ CHEGOU (em recebimento)</span></div>`;
+ if(k==='amarelo'){const falta=o.qtd-(o.entregue||0);h+=`Comprado ${fq(o.qtd)} · Entregue ${fq(o.entregue||0)}<br><b>Falta ${fq(falta)}</b><br>`}
+ else h+=`Comprado ${fq(o.qtd)}<br>`;
+ h+=`Entrega: ${fmt(o.ent)}`;
+ h+=atraso(diasDesde(o.ent));
+ return h+'</div>';
+}
+function cardSC(o){
+ const dias=diasDesde(o.criacao);
+ let h=`<div class="it s"><span class="tag t-s">SC Azul</span><br>SC <b>${esc(o.ped)}</b> · Qtd ${fq(o.qtd)}<br>Criada: ${fmt(o.criacao)}${dias!=null?` (${dias} dia${dias!==1?'s':''} aberta)`:''}<br>Necessidade: ${fmt(o.nec)}`;
+ if(dias!=null&&dias>7)h+=`<span class="warn alert">⚠ SC ATRASADA: aberta há ${dias} dias (prazo de cotação: 7)</span>`;
+ return h+'</div>';
+}
+async function render(){
+ const cons=await get('consulta'),tb=document.getElementById('tb'),sum=document.getElementById('sum');
+ if(!cons||!cons.itens.length){tb.innerHTML='<tbody><tr><td class="empty">Nenhuma consulta importada.</td></tr></tbody>';sum.innerHTML='';return}
+ const idx={};
+ for(const k of Object.keys(BASES)){
+  idx[k]={};const d=await get('base_'+k);
+  if(d)d.rows.forEach(o=>(idx[k][o.cod]??=[]).push(o));
+ }
+ let max=1,st={repor:0,atr:0,sc:0,chegou:0,pc10:0};
+ const linhas=cons.itens.map(it=>{
+  const cards=[],tags=[];let desc=it.desc,alerta10=false,scAtr=false;
+  for(const k of ['verde','amarelo','laranja','sc']){
+   for(const o of idx[k][it.cod]||[]){
+    if(!desc&&o.desc)desc=o.desc;
+    if(k==='sc'){cards.push(cardSC(o));if(diasDesde(o.criacao)>7)scAtr=true}
+    else{cards.push(cardPC(k,o));if(k==='laranja')st.chegou++;else if(diasDesde(o.ent)>10)alerta10=true}
+   }
+  }
+  if(alerta10)st.pc10++;if(scAtr)st.sc++;
+  if(!cards.length)st.repor++;
+  max=Math.max(max,cards.length);
+  return{cod:it.cod,desc,cards,alerta10,scAtr};
+ });
+ sum.innerHTML=`<span class="chip"><b>${linhas.length}</b> itens consultados</span><span class="chip"><b>${st.repor}</b> sem PC/SC (repor)</span><span class="chip"><b>${st.chegou}</b> já chegaram</span><span class="chip" style="${st.sc?'background:var(--redbg);color:var(--red)':''}"><b>${st.sc}</b> com SC &gt; 7 dias</span><span class="chip" style="${st.pc10?'background:var(--redbg);color:var(--red)':''}"><b>${st.pc10}</b> com PC &gt; 10 dias de atraso</span>`;
+ let h='<thead><tr><th>Código</th><th>Descrição</th>';
+ for(let i=0;i<max;i++)h+=`<th>Info ${i+1}</th>`;
+ h+='</tr></thead><tbody>';
+ for(const l of linhas){
+  h+=`<tr><td class="c">${esc(l.cod)}</td><td class="ds">${esc(l.desc)||'—'}</td>`;
+  if(!l.cards.length)h+=`<td colspan="${max}"><span class="rep">Sem PC nem SC: necessário repor</span></td>`;
+  else{for(let i=0;i<max;i++)h+=`<td>${l.cards[i]||''}</td>`}
+  h+='</tr>';
+ }
+ tb.innerHTML=h+'</tbody>';
+}
+// ---------- init ----------
+(async()=>{
+ await open();montarImports();
+ document.getElementById('f-consulta').addEventListener('change',e=>importarConsulta(e.target));
+ document.getElementById('clear').addEventListener('click',async()=>{
+  if(!confirm('Limpar a consulta atual e começar uma nova? As planilhas base serão mantidas.'))return;
+  await del('consulta');msg('Consulta limpa.');await render();
+ });
+ await atualizarStatus();await render();
+})();
+</script>
+</body>
+</html>
